@@ -394,6 +394,8 @@
         <section id="view-charts" class="view-section">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-[24px] font-bold tracking-tight text-gray-900 dark:text-white">Analytics</h2>
+                <input type="month" id="chart-month-filter"
+                    class="w-[130px] bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white font-medium px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/20 text-sm outline-none shadow-sm focus:ring-2 focus:ring-blue-500">
             </div>
             <div class="glass-panel overflow-hidden p-4 relative" style="height: 350px;">
                 <canvas id="incomeExpenseChart"></canvas>
@@ -477,8 +479,15 @@
                 authButton.classList.add('flex');
                 authResetBtn.classList.remove('hidden');
 
-                // Auto trigger auth after short delay
-                setTimeout(authenticate, 400);
+                // Try auto-authenticate immediately
+                authenticate(false);
+
+                // If mobile Safari blocks it without user gesture, 
+                // any tap on the screen should trigger it automatically.
+                authScreen.addEventListener('click', (e) => {
+                    if (e.target.closest('#auth-reset-btn')) return;
+                    authenticate(true);
+                });
             } else {
                 // Provide setup option
                 authTitle.innerText = "Secure Dashboard";
@@ -531,11 +540,14 @@
             }
         }
 
-        async function authenticate() {
+        let isAuthenticating = false;
+        async function authenticate(isUserGesture = false) {
+            if (isAuthenticating) return;
             try {
                 const storedCredId = localStorage.getItem('fintrack_biometric_id');
                 if (!storedCredId) return;
 
+                isAuthenticating = true;
                 const challenge = new Uint8Array(32);
                 window.crypto.getRandomValues(challenge);
 
@@ -554,6 +566,15 @@
                 unlockApp();
             } catch (err) {
                 console.error(err);
+                isAuthenticating = false;
+
+                if (isUserGesture !== true && (err.name === 'NotAllowedError' || err.message.toLowerCase().includes('user activation'))) {
+                    authTitle.innerText = "FinTrack Locked";
+                    authSubtitle.innerText = "Tap anywhere to verify Face ID.";
+                    authButton.querySelector('span').innerText = "Tap to Unlock";
+                    return;
+                }
+
                 authTitle.innerText = "Authentication Failed";
                 authSubtitle.innerText = "Please try again to unlock.";
                 authButton.querySelector('span').innerText = "Try Again";
@@ -721,11 +742,13 @@
 
         const adminMonthFilter = document.getElementById('admin-month-filter');
         const billingMonthFilter = document.getElementById('billing-month-filter');
+        const chartMonthFilter = document.getElementById('chart-month-filter');
 
         const now = new Date();
         const currentMonthVal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         adminMonthFilter.value = currentMonthVal;
         billingMonthFilter.value = currentMonthVal;
+        chartMonthFilter.value = currentMonthVal;
 
         const renderFilteredList = (containerElement, txArray, monthVal) => {
             if (!txArray || txArray.length === 0) {
@@ -751,21 +774,34 @@
             renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
         });
 
+        chartMonthFilter.addEventListener('change', () => {
+            renderMobileChart(rawAdminTx, rawBillingTx);
+        });
+
         window.mobileChartInstance = null;
         const renderMobileChart = (txArray, billingArray) => {
             const ctx = document.getElementById('incomeExpenseChart');
             if (!ctx) return;
             
             const map = {};
+            const filterMonth = chartMonthFilter.value;
+
             const processTx = (tx) => {
                 if (!tx.date || !tx.amount) return;
-                const day = tx.date; // Use full YYYY-MM-DD
-                if (!map[day]) map[day] = { income: 0, expense: 0 };
+                
+                if (filterMonth && !tx.date.startsWith(filterMonth)) return;
+
+                const parts = tx.date.split('-');
+                if (parts.length < 3) return;
+
+                const dayLabel = filterMonth ? parts[2] : `${parts[1]}/${parts[2]}`;
+
+                if (!map[dayLabel]) map[dayLabel] = { income: 0, expense: 0 };
                 
                 if (tx.type === 'income') {
-                    map[day].income += parseFloat(tx.amount) || 0;
+                    map[dayLabel].income += parseFloat(tx.amount) || 0;
                 } else if (tx.type === 'expense') {
-                    map[day].expense += parseFloat(tx.amount) || 0;
+                    map[dayLabel].expense += parseFloat(tx.amount) || 0;
                 }
             };
             
