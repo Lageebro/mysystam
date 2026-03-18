@@ -205,6 +205,36 @@
         <p class="text-[15px] text-gray-700 dark:text-gray-300 font-medium">Syncing UI...</p>
     </div>
 
+    <!-- 2.5 Auth Screen (Face ID Lock) -->
+    <div id="auth-screen" class="fixed inset-0 z-[100] bg-white dark:bg-[#0a0f1c] flex flex-col items-center justify-center transition-opacity duration-500">
+        <div id="auth-content" class="text-center flex flex-col items-center justify-center w-full px-8">
+            <div class="w-24 h-24 rounded-full bg-blue-500/10 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(10,132,255,0.2)]">
+                <i class="ph ph-face-id text-6xl text-blue-500"></i>
+            </div>
+            <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight" id="auth-title">Checking Security</h2>
+            <p class="text-gray-500 dark:text-gray-400 mb-10 text-sm font-medium" id="auth-subtitle">Securing your financial data</p>
+            
+            <button id="auth-button" class="hidden w-full max-w-[250px] bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/30 active:scale-95 transition-all text-[16px] items-center justify-center gap-2">
+                <i class="ph ph-scan text-xl"></i>
+                <span>Unlock Dashboard</span>
+            </button>
+            
+            <button id="setup-auth-button" class="hidden w-full max-w-[250px] bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-8 py-3.5 rounded-2xl font-bold shadow-lg shadow-emerald-500/30 active:scale-95 transition-all text-[16px] items-center justify-center gap-2">
+                <i class="ph ph-lock-key text-xl"></i>
+                <span>Setup Face ID</span>
+            </button>
+
+            <!-- Reset lock data if stuck -->
+            <button id="auth-reset-btn" class="hidden mt-8 text-gray-400 dark:text-gray-600 text-[13px] underline active:text-gray-800 dark:active:text-gray-300">
+                Having trouble? Reset Lock
+            </button>
+            
+            <button id="auth-skip-btn" class="hidden mt-6 text-gray-400 dark:text-gray-500 text-[14px] font-medium active:text-gray-600 dark:active:text-gray-300 transition-colors">
+                Skip for now
+            </button>
+        </div>
+    </div>
+
     <!-- 3. Main Interface -->
     <main class="flex-1 overflow-y-auto px-5 pt-6 pb-28 relative z-10 w-full max-w-md mx-auto">
         
@@ -312,6 +342,147 @@
 
     <!-- Logic Script -->
     <script>
+        // --- Biometrics & Lock Screen Logic ---
+        const authScreen = document.getElementById('auth-screen');
+        const authButton = document.getElementById('auth-button');
+        const setupAuthButton = document.getElementById('setup-auth-button');
+        const authTitle = document.getElementById('auth-title');
+        const authSubtitle = document.getElementById('auth-subtitle');
+        const authSkipBtn = document.getElementById('auth-skip-btn');
+        const authResetBtn = document.getElementById('auth-reset-btn');
+
+        // Utility to base64url encode/decode
+        const bufferToBase64url = (buffer) => {
+            const bytes = new Uint8Array(buffer);
+            let str = '';
+            for (let char of bytes) str += String.fromCharCode(char);
+            return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        };
+        const base64urlToBuffer = (base64url) => {
+            const padding = '='.repeat((4 - base64url.length % 4) % 4);
+            const base64 = (base64url + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = atob(base64);
+            const buffer = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) buffer[i] = rawData.charCodeAt(i);
+            return buffer.buffer;
+        };
+
+        const isWebAuthnAvailable = window.PublicKeyCredential !== undefined && 
+                                    (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const storedCredential = localStorage.getItem('fintrack_biometric_id');
+
+        function unlockApp() {
+            authScreen.style.opacity = '0';
+            setTimeout(() => {
+                authScreen.style.display = 'none';
+            }, 500);
+        }
+
+        if (isWebAuthnAvailable) {
+            if (storedCredential) {
+                // Return user
+                authTitle.innerText = "FinTrack Locked";
+                authSubtitle.innerText = "Use Face ID or Touch ID to unlock";
+                authButton.classList.remove('hidden');
+                authButton.classList.add('flex');
+                authResetBtn.classList.remove('hidden');
+                
+                // Auto trigger auth after short delay
+                setTimeout(authenticate, 400);
+            } else {
+                // Provide setup option
+                authTitle.innerText = "Secure Dashboard";
+                authSubtitle.innerText = "Add Face ID / Touch ID lock to protect your data.";
+                setupAuthButton.classList.remove('hidden');
+                setupAuthButton.classList.add('flex');
+                authSkipBtn.classList.remove('hidden');
+            }
+        } else {
+            // Not supported or not HTTPS, bypass lock
+            unlockApp();
+        }
+
+        async function setupBiometrics() {
+            try {
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+                const userId = new Uint8Array(16);
+                window.crypto.getRandomValues(userId);
+
+                const options = {
+                    challenge,
+                    rp: { name: "FinTrack Dashboard", id: window.location.hostname || "localhost" },
+                    user: { id: userId, name: "admin_fintrack", displayName: "Lagee Garan" },
+                    pubKeyCredParams: [
+                        { alg: -7, type: "public-key" },  // ES256
+                        { alg: -257, type: "public-key" } // RS256
+                    ],
+                    authenticatorSelection: {
+                        authenticatorAttachment: "platform", // forces local biometric like FaceID
+                        userVerification: "required"
+                    },
+                    timeout: 60000,
+                    attestation: "none"
+                };
+
+                const credential = await navigator.credentials.create({ publicKey: options });
+                localStorage.setItem('fintrack_biometric_id', bufferToBase64url(credential.rawId));
+                
+                // Success
+                authTitle.innerText = "Setup Complete!";
+                authSubtitle.innerText = "Your dashboard is now secured.";
+                setupAuthButton.classList.add('hidden');
+                authSkipBtn.classList.add('hidden');
+                
+                setTimeout(unlockApp, 1000);
+            } catch (err) {
+                console.error(err);
+                alert("Setup Failed. Note: This feature requires a secure connection (HTTPS) and a supported device (e.g. iPhone with Face ID).");
+            }
+        }
+
+        async function authenticate() {
+            try {
+                const storedCredId = localStorage.getItem('fintrack_biometric_id');
+                if (!storedCredId) return;
+
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+
+                const options = {
+                    challenge,
+                    allowCredentials: [{
+                        id: base64urlToBuffer(storedCredId),
+                        type: 'public-key',
+                        transports: ['internal'],
+                    }],
+                    userVerification: "required",
+                    timeout: 60000,
+                };
+
+                await navigator.credentials.get({ publicKey: options });
+                unlockApp();
+            } catch (err) {
+                console.error(err);
+                authTitle.innerText = "Authentication Failed";
+                authSubtitle.innerText = "Please try again to unlock.";
+                authButton.querySelector('span').innerText = "Try Again";
+            }
+        }
+
+        authButton.addEventListener('click', authenticate);
+        setupAuthButton.addEventListener('click', setupBiometrics);
+        authSkipBtn.addEventListener('click', unlockApp);
+        authResetBtn.addEventListener('click', () => {
+            if(confirm('Are you sure you want to reset the lock? You will need to set it up again.')) {
+                localStorage.removeItem('fintrack_biometric_id');
+                window.location.reload();
+            }
+        });
+
+        // --- End Biometrics Logic ---
+
+
         document.getElementById('year').textContent = new Date().getFullYear();
 
         // Theme Toggle Logic
