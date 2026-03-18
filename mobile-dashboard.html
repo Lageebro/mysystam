@@ -300,7 +300,12 @@
 
         <!-- VIEW 2: ADMIN TRANSACTIONS -->
         <section id="view-admin" class="view-section">
-            <h2 class="text-[26px] font-bold mb-4 tracking-tight text-gray-900 dark:text-white">Admin Entries</h2>
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-[24px] font-extrabold tracking-tight text-gray-900 dark:text-white">Admin Entries</h2>
+                <div class="relative">
+                    <input type="month" id="admin-month-filter" class="w-[145px] bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-[#1a233a] dark:to-[#171f33] text-blue-700 dark:text-blue-400 font-bold px-3 py-2.5 rounded-2xl border-[1.5px] border-blue-200 dark:border-blue-800/60 text-[13px] shadow-[0_8px_16px_rgba(59,130,246,0.15)] dark:shadow-[0_8px_16px_rgba(0,0,0,0.4)] focus:ring-2 focus:ring-blue-500 transition-all outline-none cursor-pointer uppercase tracking-wider text-center block">
+                </div>
+            </div>
             <div class="glass-panel overflow-hidden p-1">
                 <ul id="admin-tx-list" class="divide-y divide-black/5 dark:divide-white/10">
                     <div class="py-12 text-center text-gray-500 text-[15px]">Syncing Data...</div>
@@ -310,7 +315,12 @@
 
         <!-- VIEW 3: BILLING TRANSACTIONS -->
         <section id="view-billing" class="view-section">
-            <h2 class="text-[26px] font-bold mb-4 tracking-tight text-gray-900 dark:text-white">System Invoices</h2>
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-[24px] font-extrabold tracking-tight text-gray-900 dark:text-white">System Invoices</h2>
+                <div class="relative">
+                    <input type="month" id="billing-month-filter" class="w-[145px] bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-[#162a26] dark:to-[#142622] text-teal-700 dark:text-emerald-400 font-bold px-3 py-2.5 rounded-2xl border-[1.5px] border-teal-200 dark:border-teal-800/60 text-[13px] shadow-[0_8px_16px_rgba(20,184,166,0.15)] dark:shadow-[0_8px_16px_rgba(0,0,0,0.4)] focus:ring-2 focus:ring-teal-500 transition-all outline-none cursor-pointer uppercase tracking-wider text-center block">
+                </div>
+            </div>
             <div class="glass-panel overflow-hidden p-1">
                 <ul id="billing-tx-list" class="divide-y divide-black/5 dark:divide-white/10">
                     <div class="py-12 text-center text-gray-500 text-[15px]">Syncing Data...</div>
@@ -614,6 +624,41 @@
         const uiAdminList = document.getElementById('admin-tx-list');
         const uiBillingList = document.getElementById('billing-tx-list');
 
+        let rawAdminTx = [];
+        let rawBillingTx = [];
+
+        const adminMonthFilter = document.getElementById('admin-month-filter');
+        const billingMonthFilter = document.getElementById('billing-month-filter');
+
+        const now = new Date();
+        const currentMonthVal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+        adminMonthFilter.value = currentMonthVal;
+        billingMonthFilter.value = currentMonthVal;
+
+        const renderFilteredList = (containerElement, txArray, monthVal) => {
+            if (!txArray || txArray.length === 0) {
+                renderList(containerElement, []);
+                return;
+            }
+            if (!monthVal) {
+                renderList(containerElement, txArray);
+                return;
+            }
+            const filtered = txArray.filter(tx => {
+                if (!tx.date) return false;
+                return tx.date.startsWith(monthVal);
+            });
+            renderList(containerElement, filtered);
+        };
+
+        adminMonthFilter.addEventListener('change', () => {
+             renderFilteredList(uiAdminList, rawAdminTx, adminMonthFilter.value);
+        });
+
+        billingMonthFilter.addEventListener('change', () => {
+             renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
+        });
+
         const syncRef = ref(db, 'fin_tracker');
         
         onValue(syncRef, (snapshot) => {
@@ -632,9 +677,12 @@
                     uiLastUpdated.innerText = "Sync: " + time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 }
 
-                // Render both lists
-                renderList(uiAdminList, data.recentTransactions);
-                renderList(uiBillingList, data.recentBillingTx);
+                rawAdminTx = data.recentTransactions || [];
+                rawBillingTx = data.recentBillingTx || [];
+
+                // Render both lists based on current filter
+                renderFilteredList(uiAdminList, rawAdminTx, adminMonthFilter.value);
+                renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
 
             } else {
                 uiAdminList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
