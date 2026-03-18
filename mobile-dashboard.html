@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>My System Dashboard</title>
+
+    <!-- App Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#o000000">
+    
+    <link rel="icon" type="image/png" href="2.png">
+    <link rel="apple-touch-icon" href="2.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#14b8a6', 
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'sans-serif'],
+                    },
+                    animation: {
+                        blob: "blob 7s infinite",
+                    },
+                    keyframes: {
+                        blob: {
+                            "0%": { transform: "translate(0px, 0px) scale(1)" },
+                            "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+                            "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+                            "100%": { transform: "translate(0px, 0px) scale(1)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body {
+            /* Let the background layer handle colors */
+            background-color: transparent;
+            color: #1f2937; /* light mode default text */
+            padding-bottom: env(safe-area-inset-bottom);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            overscroll-behavior-y: none;
+        }
+
+        .dark body {
+            color: white;
+        }
+
+        /* Ambient animated background */
+        .ambient-bg {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            transition: background 0.6s ease;
+        }
+
+        /* Glassmorphism Styles */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            border-radius: 28px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+            transition: all 0.4s ease;
+        }
+
+        .dark .glass-panel {
+            background: rgba(20, 20, 25, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            border-top: 1px solid rgba(255, 255, 255, 0.6);
+            transition: all 0.4s ease;
+        }
+
+        .dark .glass-nav {
+            background: rgba(15, 15, 20, 0.7);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-btn {
+            background: rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .dark .glass-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .balance-gradient {
+            background: linear-gradient(135deg, rgba(10, 132, 255, 0.9), rgba(0, 85, 179, 0.9));
+            color: white;
+        }
+
+        /* Hide scrollbar */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        .spinner {
+            border: 3px solid rgba(10, 132, 255, 0.2);
+            border-radius: 50%;
+            border-top: 3px solid #0A84FF;
+            width: 36px;
+            height: 36px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .view-section {
+            display: none;
+            opacity: 0;
+            transform: scale(0.97) translateY(10px);
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        
+        .view-section.active {
+            display: block;
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        
+        .nav-item {
+            transition: all 0.2s ease;
+            color: #6b7280; /* light mode inactive */
+        }
+        
+        .dark .nav-item {
+            color: #9ca3af; /* dark mode inactive */
+        }
+        
+        .nav-item.active {
+            color: #0A84FF !important;
+            transform: scale(1.05);
+        }
+        
+        .nav-item.active > i {
+            font-weight: bold;
+        }
+        
+        /* Utility delay classes */
+        .delay-100 { animation-delay: 100ms; }
+        .delay-200 { animation-delay: 200ms; }
+        .delay-300 { animation-delay: 300ms; }
+        
+        .fade-in {
+            animation: fadeIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards !important;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* For animated blobs behind */
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+    </style>
+</head>
+
+<body class="antialiased min-h-screen flex flex-col pt-[env(safe-area-inset-top)]">
+
+    <!-- 1. Ambient Background Layer -->
+    <div class="ambient-bg bg-gradient-to-br from-indigo-50 via-white to-pink-50 dark:from-[#0a0f1c] dark:via-[#050505] dark:to-[#1a0b1c]">
+        <!-- Animated Blobs (Glassmorphism effect) -->
+        <div class="absolute top-0 -left-10 w-72 h-72 bg-purple-300 dark:bg-purple-600 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[100px] opacity-60 animate-blob"></div>
+        <div class="absolute top-20 -right-10 w-72 h-72 bg-teal-200 dark:bg-teal-600 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[100px] opacity-60 animate-blob animation-delay-2000"></div>
+        <div class="absolute -bottom-32 left-20 w-80 h-80 bg-pink-300 dark:bg-rose-700 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[100px] opacity-60 animate-blob animation-delay-4000"></div>
+    </div>
+
+    <!-- 2. Loader -->
+    <div id="loader" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/50 dark:bg-black/80 backdrop-blur-xl transition-opacity duration-300">
+        <div class="spinner mb-4"></div>
+        <p class="text-[15px] text-gray-700 dark:text-gray-300 font-medium">Syncing UI...</p>
+    </div>
+
+    <!-- 3. Main Interface -->
+    <main class="flex-1 overflow-y-auto px-5 pt-6 pb-28 relative z-10 w-full max-w-md mx-auto">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full overflow-hidden border-[1px] border-white/50 dark:border-gray-700 shadow-md">
+                    <img src="2.png" alt="Logo" class="w-full h-full object-cover">
+                </div>
+                <div>
+                    <h1 class="text-[22px] font-extrabold tracking-tight text-gray-900 dark:text-white">FinTrack</h1>
+                    <p id="ui-last-updated" class="text-[12px] text-gray-500 dark:text-gray-400 font-medium">Live Sync</p>
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <!-- Theme Toggle Button -->
+                <button id="theme-toggle" class="glass-btn w-10 h-10 rounded-full flex items-center justify-center text-gray-800 dark:text-gray-200 active:scale-95 transition-transform">
+                    <i class="ph ph-moon text-[20px] dark:hidden block"></i>
+                    <i class="ph ph-sun text-[20px] hidden dark:block text-yellow-400"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- VIEW 1: DASHBOARD -->
+        <section id="view-dashboard" class="view-section active">
+            <!-- Glass Balance Card -->
+            <div class="glass-panel balance-gradient p-6 mb-5 relative overflow-hidden fade-in">
+                <!-- Watermark -->
+                <i class="ph ph-wallet absolute right-[-15px] bottom-[-25px] text-[160px] opacity-[0.15]"></i>
+                <p class="text-white/90 text-[13px] font-semibold mb-1 uppercase tracking-widest leading-none drop-shadow-sm">Net Balance</p>
+                <div class="flex items-end gap-1 mb-1 relative z-10">
+                    <span class="text-white text-xl font-medium mb-1 drop-shadow-sm">Rs.</span>
+                    <h2 id="ui-net-balance" class="text-5xl font-extrabold tracking-tight drop-shadow-md">0.00</h2>
+                </div>
+                <div class="mt-8 flex justify-between items-center relative z-10 text-white/80 text-xs font-medium">
+                    <span class="bg-white/20 px-3 py-1 rounded-full backdrop-blur-md">Lagee Garan</span>
+                    <span class="bg-white/20 px-3 py-1 rounded-full backdrop-blur-md border border-white/10"><i class="ph ph-shield-check mr-1"></i>Secure</span>
+                </div>
+            </div>
+
+            <!-- Income & Expense Row -->
+            <div class="grid grid-cols-2 gap-4 mb-6 fade-in delay-100">
+                <div class="glass-panel p-5 relative overflow-hidden">
+                    <div class="w-10 h-10 rounded-[14px] bg-[#30D158]/20 flex items-center justify-center mb-3">
+                        <i class="ph ph-trend-up text-[#30D158] text-xl font-bold"></i>
+                    </div>
+                    <p class="text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider mb-0.5">Total Income</p>
+                    <h3 id="ui-total-income" class="text-xl font-bold text-gray-900 dark:text-white tracking-tight leading-none">Rs. 0.00</h3>
+                </div>
+
+                <div class="glass-panel p-5 relative overflow-hidden">
+                    <div class="w-10 h-10 rounded-[14px] bg-[#FF453A]/20 flex items-center justify-center mb-3">
+                        <i class="ph ph-trend-down text-[#FF453A] text-xl font-bold"></i>
+                    </div>
+                    <p class="text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider mb-0.5">Total Expense</p>
+                    <h3 id="ui-total-expense" class="text-xl font-bold text-gray-900 dark:text-white tracking-tight leading-none">Rs. 0.00</h3>
+                </div>
+            </div>
+            
+            <p class="text-center text-[10px] text-gray-400 dark:text-gray-600 font-medium uppercase tracking-widest mt-10 fade-in delay-200">&copy; <span id="year"></span> Developed by Lagee Garan</p>
+        </section>
+
+        <!-- VIEW 2: ADMIN TRANSACTIONS -->
+        <section id="view-admin" class="view-section">
+            <h2 class="text-[26px] font-bold mb-4 tracking-tight text-gray-900 dark:text-white">Admin Entries</h2>
+            <div class="glass-panel overflow-hidden p-1">
+                <ul id="admin-tx-list" class="divide-y divide-black/5 dark:divide-white/10">
+                    <div class="py-12 text-center text-gray-500 text-[15px]">Syncing Data...</div>
+                </ul>
+            </div>
+        </section>
+
+        <!-- VIEW 3: BILLING TRANSACTIONS -->
+        <section id="view-billing" class="view-section">
+            <h2 class="text-[26px] font-bold mb-4 tracking-tight text-gray-900 dark:text-white">System Invoices</h2>
+            <div class="glass-panel overflow-hidden p-1">
+                <ul id="billing-tx-list" class="divide-y divide-black/5 dark:divide-white/10">
+                    <div class="py-12 text-center text-gray-500 text-[15px]">Syncing Data...</div>
+                </ul>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 4. iOS Glass Bottom Navigation Bar -->
+    <nav class="glass-nav fixed bottom-0 left-0 right-0 z-40 w-full pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] px-2 block">
+        <div class="flex justify-around items-center max-w-sm mx-auto">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-item active flex flex-col items-center gap-1 w-20">
+                <div class="relative">
+                    <i class="ph ph-house text-[24px]"></i>
+                </div>
+                <span class="text-[10px] font-semibold">Home</span>
+            </button>
+            <button onclick="switchTab('admin')" id="tab-admin" class="nav-item flex flex-col items-center gap-1 w-20">
+                <i class="ph ph-clipboard-text text-[24px]"></i>
+                <span class="text-[10px] font-semibold leading-tight text-center">Admin Tx</span>
+            </button>
+            <button onclick="switchTab('billing')" id="tab-billing" class="nav-item flex flex-col items-center gap-1 w-20">
+                <i class="ph ph-receipt text-[24px]"></i>
+                <span class="text-[10px] font-semibold leading-tight text-center">Billing Tx</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Logic Script -->
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        // Theme Toggle Logic
+        const htmlObj = document.documentElement;
+        const themeBtn = document.getElementById('theme-toggle');
+
+        // Check LocalStorage or default to dark
+        if (localStorage.getItem('mobile-theme') === 'light') {
+            htmlObj.classList.remove('dark');
+        } else {
+            htmlObj.classList.add('dark'); // dark is default
+        }
+
+        themeBtn.addEventListener('click', () => {
+            if (navigator.vibrate) navigator.vibrate(15);
+            htmlObj.classList.toggle('dark');
+            const isDark = htmlObj.classList.contains('dark');
+            localStorage.setItem('mobile-theme', isDark ? 'dark' : 'light');
+        });
+
+        // Tab Switching Logic
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-section').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            const targetView = document.getElementById('view-' + tabId);
+            const targetTab = document.getElementById('tab-' + tabId);
+            
+            targetView.classList.add('active');
+            targetTab.classList.add('active');
+            
+            if (navigator.vibrate) navigator.vibrate(10);
+            document.querySelector('main').scrollTop = 0;
+        }
+    </script>
+
+    <!-- Firebase Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // Same Database Config as main web!
+        const firebaseConfig = {
+            apiKey: "AIzaSyAsv4wxmihP1K6h8fh49jUzHJ4Mx2e-iRQ",
+            authDomain: "my-systam.firebaseapp.com",
+            databaseURL: "https://my-systam-default-rtdb.firebaseio.com",
+            projectId: "my-systam",
+            storageBucket: "my-systam.firebasestorage.app",
+            messagingSenderId: "872309360360",
+            appId: "1:872309360360:web:6f48040a6812f85422eb5d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const formatCurrency = (val) => {
+            return parseFloat(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        const timeAgo = (dateStr) => {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / 86400000); 
+            
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+            return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+
+        // Render IOS-styled Rows inside frosted glass panel
+        const renderList = (containerElement, txArray) => {
+            containerElement.innerHTML = '';
+            
+            if (!txArray || txArray.length === 0) {
+                containerElement.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">No transactions available.</div>`;
+                return;
+            }
+
+            txArray.forEach(tx => {
+                const isIncome = tx.type === 'income';
+                const textColorLight = isIncome ? 'text-[#248A3D]' : 'text-[#B3261E]'; // light mode bold colors
+                const textColorDark = isIncome ? 'dark:text-[#30D158]' : 'dark:text-[#FF453A]'; // dark mode glowing colors
+                
+                const iconBgLight = isIncome ? 'bg-[#30D158]/20' : 'bg-[#FF453A]/20';
+                const iconBgDark = isIncome ? 'dark:bg-[#30D158]/20' : 'dark:bg-[#FF453A]/20';
+
+                const iconColorLight = isIncome ? 'text-[#248A3D]' : 'text-[#B3261E]';
+                const iconColorDark = isIncome ? 'dark:text-[#30D158]' : 'dark:text-[#FF453A]';
+
+                const prefix = isIncome ? '+' : '-';
+                
+                containerElement.innerHTML += `
+                    <li class="flex items-center justify-between p-4 active:bg-gray-100 dark:active:bg-gray-800 transition-colors cursor-pointer">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <div class="w-11 h-11 rounded-2xl ${iconBgLight} ${iconBgDark} flex items-center justify-center shrink-0">
+                                <i class="ph ${isIncome ? 'ph-arrow-down-left' : 'ph-arrow-up-right'} text-[22px] font-bold ${iconColorLight} ${iconColorDark}"></i>
+                            </div>
+                            <div class="flex flex-col overflow-hidden">
+                                <span class="text-gray-900 dark:text-white font-semibold text-[16px] truncate leading-tight mb-0.5" style="max-width: 140px;">
+                                    ${tx.description || 'System Update'}
+                                </span>
+                                <span class="text-[12px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-widest leading-tight">
+                                    ${timeAgo(tx.date)}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end shrink-0 pl-2">
+                            <span class="font-bold text-[16px] ${textColorLight} ${textColorDark} tracking-tight">
+                                ${prefix}Rs ${formatCurrency(tx.amount)}
+                            </span>
+                        </div>
+                    </li>
+                `;
+            });
+        };
+
+        const uiIncome = document.getElementById('ui-total-income');
+        const uiExpense = document.getElementById('ui-total-expense');
+        const uiBalance = document.getElementById('ui-net-balance');
+        const loader = document.getElementById('loader');
+        const uiLastUpdated = document.getElementById('ui-last-updated');
+        
+        const uiAdminList = document.getElementById('admin-tx-list');
+        const uiBillingList = document.getElementById('billing-tx-list');
+
+        const syncRef = ref(db, 'fin_tracker');
+        
+        onValue(syncRef, (snapshot) => {
+            loader.style.opacity = '0';
+            setTimeout(() => loader.style.display = 'none', 300);
+
+            const data = snapshot.val();
+            
+            if (data) {
+                uiIncome.innerText = 'Rs. ' + formatCurrency(data.totalIncome || 0);
+                uiExpense.innerText = 'Rs. ' + formatCurrency(data.totalExpense || 0);
+                uiBalance.innerText = formatCurrency(data.netBalance || 0);
+                
+                if (data.lastUpdated) {
+                    const time = new Date(data.lastUpdated);
+                    uiLastUpdated.innerText = "Sync: " + time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                }
+
+                // Render both lists
+                renderList(uiAdminList, data.recentTransactions);
+                renderList(uiBillingList, data.recentBillingTx);
+
+            } else {
+                uiAdminList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
+                uiBillingList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
+            }
+        }, (error) => {
+            console.error("Firebase Read Error", error);
+            loader.innerHTML = `<div class="text-[#FF453A] font-bold text-[17px]">Network Error</div><p class="text-[15px] text-gray-600 dark:text-gray-400 mt-2">Check internet connection.</p>`;
+        });
+    </script>
+</body>
+</html>
