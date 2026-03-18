@@ -219,6 +219,8 @@
             animation-delay: 4s;
         }
     </style>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body class="antialiased min-h-screen flex flex-col pt-[env(safe-area-inset-top)]">
@@ -388,6 +390,16 @@
             </div>
         </section>
 
+        <!-- VIEW 4: CHARTS -->
+        <section id="view-charts" class="view-section">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-[24px] font-bold tracking-tight text-gray-900 dark:text-white">Analytics</h2>
+            </div>
+            <div class="glass-panel overflow-hidden p-4 relative" style="height: 350px;">
+                <canvas id="incomeExpenseChart"></canvas>
+            </div>
+        </section>
+
     </main>
 
     <!-- 4. iOS Glass Bottom Navigation Bar -->
@@ -409,6 +421,11 @@
                 class="nav-item flex flex-col items-center gap-1 w-20">
                 <i class="ph ph-receipt text-[24px]"></i>
                 <span class="text-[10px] font-semibold leading-tight text-center">Billing Tx</span>
+            </button>
+            <button onclick="switchTab('charts')" id="tab-charts"
+                class="nav-item flex flex-col items-center gap-1 w-20">
+                <i class="ph ph-chart-line-up text-[24px]"></i>
+                <span class="text-[10px] font-semibold leading-tight text-center">Analytics</span>
             </button>
         </div>
     </nav>
@@ -574,6 +591,18 @@
             htmlObj.classList.toggle('dark');
             const isDark = htmlObj.classList.contains('dark');
             localStorage.setItem('mobile-theme', isDark ? 'dark' : 'light');
+            
+            if (window.mobileChartInstance) {
+                const color = isDark ? '#fff' : '#000';
+                const tickColor = isDark ? '#aaa' : '#555';
+                const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+                window.mobileChartInstance.options.plugins.legend.labels.color = color;
+                window.mobileChartInstance.options.scales.x.ticks.color = tickColor;
+                window.mobileChartInstance.options.scales.y.ticks.color = tickColor;
+                window.mobileChartInstance.options.scales.x.grid.color = gridColor;
+                window.mobileChartInstance.options.scales.y.grid.color = gridColor;
+                window.mobileChartInstance.update();
+            }
         });
 
         // Tab Switching Logic
@@ -722,6 +751,104 @@
             renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
         });
 
+        window.mobileChartInstance = null;
+        const renderMobileChart = (txArray, billingArray) => {
+            const ctx = document.getElementById('incomeExpenseChart');
+            if (!ctx) return;
+            
+            const map = {};
+            const processTx = (tx) => {
+                if (!tx.date || !tx.amount) return;
+                const day = tx.date; // Use full YYYY-MM-DD
+                if (!map[day]) map[day] = { income: 0, expense: 0 };
+                
+                if (tx.type === 'income') {
+                    map[day].income += parseFloat(tx.amount) || 0;
+                } else if (tx.type === 'expense') {
+                    map[day].expense += parseFloat(tx.amount) || 0;
+                }
+            };
+            
+            (txArray || []).forEach(processTx);
+            (billingArray || []).forEach(processTx);
+            
+            const labels = Object.keys(map).sort();
+            const incomeData = labels.map(l => map[l].income);
+            const expenseData = labels.map(l => map[l].expense);
+            
+            const data = {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Income',
+                        data: incomeData,
+                        borderColor: '#30D158',
+                        backgroundColor: 'rgba(48, 209, 88, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#30D158',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Expense',
+                        data: expenseData,
+                        borderColor: '#FF453A',
+                        backgroundColor: 'rgba(255, 69, 58, 0.1)',
+                        borderWidth: 3,
+                        pointBackgroundColor: '#FF453A',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            };
+            
+            const isDark = document.documentElement.classList.contains('dark');
+            const labelColor = isDark ? '#fff' : '#000';
+            const tickColor = isDark ? '#aaa' : '#555';
+            const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
+            if (window.mobileChartInstance) {
+                window.mobileChartInstance.data = data;
+                window.mobileChartInstance.options.plugins.legend.labels.color = labelColor;
+                window.mobileChartInstance.options.scales.x.ticks.color = tickColor;
+                window.mobileChartInstance.options.scales.y.ticks.color = tickColor;
+                window.mobileChartInstance.options.scales.x.grid.color = gridColor;
+                window.mobileChartInstance.options.scales.y.grid.color = gridColor;
+                window.mobileChartInstance.update();
+            } else {
+                window.mobileChartInstance = new Chart(ctx.getContext('2d'), {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                labels: { color: labelColor, font: { family: 'Inter', size: 12 } }
+                            }
+                        },
+                        scales: {
+                            x: { 
+                                ticks: { color: tickColor, font: { family: 'Inter', size: 10 } },
+                                grid: { display: false }
+                            },
+                            y: { 
+                                beginAtZero: true,
+                                ticks: { color: tickColor, font: { family: 'Inter', size: 10 } },
+                                grid: { color: gridColor }
+                            }
+                        }
+                    }
+                });
+            }
+        };
+
         const syncRef = ref(db, 'fin_tracker');
 
         onValue(syncRef, (snapshot) => {
@@ -746,6 +873,9 @@
                 // Render both lists based on current filter
                 renderFilteredList(uiAdminList, rawAdminTx, adminMonthFilter.value);
                 renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
+                
+                // Render Chart
+                renderMobileChart(rawAdminTx, rawBillingTx);
 
             } else {
                 uiAdminList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
