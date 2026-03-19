@@ -218,12 +218,41 @@
         .animation-delay-4000 {
             animation-delay: 4s;
         }
+
+        /* Pull to Refresh Indicator */
+        #pull-indicator {
+            position: fixed;
+            top: -60px;
+            left: 0;
+            right: 0;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: transform 0.2s ease;
+            pointer-events: none;
+        }
+
+        .pull-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(10, 132, 255, 0.2);
+            border-top-color: #0A84FF;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
     </style>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body class="antialiased min-h-screen flex flex-col pt-[env(safe-area-inset-top)]">
+<body class="antialiased min-h-screen flex flex-col pt-[env(safe-area-inset-top)] overscroll-none">
+
+    <!-- Pull to Refresh UI -->
+    <div id="pull-indicator">
+        <div class="pull-spinner"></div>
+    </div>
 
     <!-- 1. Ambient Background Layer -->
     <div
@@ -503,8 +532,8 @@
                 authButton.classList.add('flex');
                 authResetBtn.classList.remove('hidden');
 
-                // Try auto-authenticate immediately
-                authenticate(false);
+                // Try auto-authenticate immediately after a tiny delay for better success
+                setTimeout(() => authenticate(false), 500);
 
                 // If mobile Safari blocks it without user gesture, 
                 // any tap on the screen should trigger it automatically.
@@ -623,6 +652,57 @@
         // Theme Toggle Logic
         const htmlObj = document.documentElement;
         const themeBtn = document.getElementById('theme-toggle');
+
+        // --- Pull to Refresh Logic ---
+        let startY = 0;
+        let currentY = 0;
+        let isPulling = false;
+        const pullIndicator = document.getElementById('pull-indicator');
+
+        window.addEventListener('touchstart', (e) => {
+            if (window.scrollY === 0) {
+                startY = e.touches[0].pageY;
+                isPulling = true;
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (!isPulling) return;
+            currentY = e.touches[0].pageY;
+            const diff = currentY - startY;
+
+            if (diff > 0 && window.scrollY === 0) {
+                // Pulling down
+                const pullDistance = Math.min(diff * 0.4, 80); // dampened pull
+                pullIndicator.style.transform = `translateY(${pullDistance}px)`;
+                
+                if (diff > 150) {
+                    pullIndicator.querySelector('.pull-spinner').style.opacity = '1';
+                } else {
+                    pullIndicator.querySelector('.pull-spinner').style.opacity = '0.5';
+                }
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (!isPulling) return;
+            const diff = currentY - startY;
+            isPulling = false;
+
+            if (diff > 150 && window.scrollY === 0) {
+                // Trigger Refresh
+                if (navigator.vibrate) navigator.vibrate(30);
+                pullIndicator.style.transform = `translateY(100px)`;
+                setTimeout(() => {
+                    window.location.reload();
+                }, 300);
+            } else {
+                // Reset
+                pullIndicator.style.transform = `translateY(0)`;
+            }
+            startY = 0;
+            currentY = 0;
+        });
 
         // Check LocalStorage or default to dark
         if (localStorage.getItem('mobile-theme') === 'light') {
@@ -939,43 +1019,83 @@
 
         const syncRef = ref(db, 'fin_tracker');
 
+        // --- Local Cache Logic ---
+        const CACHE_KEY = 'fintrack_mobile_cache';
+        const loadCache = () => {
+            const cached = localStorage.getItem(CACHE_KEY);
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    applyDataToUI(data);
+                    console.log("Loaded from cache");
+                } catch(e) { console.error("Cache error", e); }
+            }
+        };
+
+        const applyDataToUI = (data) => {
+            if (!data) return;
+            
+            uiIncome.innerText = 'Rs. ' + formatCurrency(data.totalIncome || 0);
+            uiExpense.innerText = 'Rs. ' + formatCurrency(data.totalExpense || 0);
+            uiBalance.innerText = formatCurrency(data.netBalance || 0);
+
+            if (data.lastUpdated) {
+                const time = new Date(data.lastUpdated);
+                uiLastUpdated.innerText = "Sync: " + time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }
+
+            rawAdminTx = data.recentTransactions || [];
+            rawBillingTx = data.recentBillingTx || [];
+
+            // Render both lists based on current filter
+            renderFilteredList(uiAdminList, rawAdminTx, adminMonthFilter.value);
+            renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
+            
+            // Update Dashboard Monthly Summary
+            updateMonthlySummary();
+
+            // Render Chart
+            renderMobileChart(rawAdminTx, rawBillingTx);
+        };
+
+        // Load cache immediately
+        loadCache();
+
         onValue(syncRef, (snapshot) => {
+            // Hide loader on first data
             loader.style.opacity = '0';
             setTimeout(() => loader.style.display = 'none', 300);
 
             const data = snapshot.val();
 
             if (data) {
-                uiIncome.innerText = 'Rs. ' + formatCurrency(data.totalIncome || 0);
-                uiExpense.innerText = 'Rs. ' + formatCurrency(data.totalExpense || 0);
-                uiBalance.innerText = formatCurrency(data.netBalance || 0);
-
-                if (data.lastUpdated) {
-                    const time = new Date(data.lastUpdated);
-                    uiLastUpdated.innerText = "Sync: " + time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                }
-
-                rawAdminTx = data.recentTransactions || [];
-                rawBillingTx = data.recentBillingTx || [];
-
-                // Render both lists based on current filter
-                renderFilteredList(uiAdminList, rawAdminTx, adminMonthFilter.value);
-                renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
+                // Apply to UI
+                applyDataToUI(data);
                 
-                // Update Dashboard Monthly Summary
-                updateMonthlySummary();
-
-                // Render Chart
-                renderMobileChart(rawAdminTx, rawBillingTx);
-
-
+                // Save to Cache
+                localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                
+                uiLastUpdated.classList.remove('text-red-500');
+                uiLastUpdated.innerText = "Sync: Live";
             } else {
-                uiAdminList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
-                uiBillingList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
+                // If NO data at all in Firebase
+                if (!localStorage.getItem(CACHE_KEY)) {
+                    uiAdminList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
+                    uiBillingList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
+                }
             }
         }, (error) => {
             console.error("Firebase Read Error", error);
-            loader.innerHTML = `<div class="text-[#FF453A] font-bold text-[17px]">Network Error</div><p class="text-[15px] text-gray-600 dark:text-gray-400 mt-2">Check internet connection.</p>`;
+            uiLastUpdated.innerText = "Sync: Offline";
+            uiLastUpdated.classList.add('text-red-500');
+            
+            // Still hide loader if we have cache
+            if (localStorage.getItem(CACHE_KEY)) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 300);
+            } else {
+                loader.innerHTML = `<div class="text-[#FF453A] font-bold text-[17px]">Network Error</div><p class="text-[15px] text-gray-600 dark:text-gray-400 mt-2">Check internet connection.</p>`;
+            }
         });
     </script>
 </body>
