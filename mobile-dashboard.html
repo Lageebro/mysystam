@@ -279,15 +279,24 @@
     <!-- 2.5 Auth Screen (Face ID Lock) -->
     <div id="auth-screen"
         class="fixed inset-0 z-[100] bg-white dark:bg-[#0a0f1c] flex flex-col items-center justify-center transition-opacity duration-500">
+        <!-- Subtle background decoration -->
+        <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+            <div class="absolute top-[-10%] right-[-10%] w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] animate-pulse"></div>
+            <div class="absolute bottom-[-10%] left-[-10%] w-72 h-72 bg-purple-500/10 rounded-full blur-[80px] animate-pulse animation-delay-2000"></div>
+        </div>
+
         <div id="auth-content" class="text-center flex flex-col items-center justify-center w-full px-8">
+            <!-- User Logo Circle -->
             <div
-                class="w-24 h-24 rounded-full bg-blue-500/10 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(10,132,255,0.2)]">
-                <i class="ph ph-face-id text-6xl text-blue-500"></i>
+                class="w-28 h-28 rounded-full bg-white dark:bg-gray-800 flex items-center justify-center mb-6 shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_25px_60px_rgba(0,0,0,0.6)] border-[5px] border-white dark:border-[#1e293b] p-1 overflow-hidden ring-4 ring-blue-500/10 transition-transform duration-500 hover:scale-105 active:scale-95 shadow-xl">
+                <img src="2.png" alt="Lagee" class="w-full h-full object-cover rounded-full">
             </div>
-            <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white mb-2 tracking-tight" id="auth-title">
+
+            <h1 class="text-3xl font-black text-gray-900 dark:text-white mb-1 tracking-tight">Hi Lagee</h1>
+            <h2 class="text-[17px] font-bold text-gray-700 dark:text-gray-300 mb-1 tracking-tight" id="auth-title">
                 Checking Security</h2>
-            <p class="text-gray-500 dark:text-gray-400 mb-10 text-sm font-medium" id="auth-subtitle">Securing your
-                financial data</p>
+            <p class="text-gray-400 dark:text-gray-500 mb-12 text-xs font-semibold uppercase tracking-widest" id="auth-subtitle">
+                Securing your financial data</p>
 
             <button id="auth-button"
                 class="hidden w-full max-w-[250px] bg-gradient-to-r from-blue-500 to-blue-600 text-white px-8 py-3.5 rounded-2xl font-bold shadow-lg shadow-blue-500/30 active:scale-95 transition-all text-[16px] items-center justify-center gap-2">
