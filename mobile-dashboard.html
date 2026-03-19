@@ -357,6 +357,30 @@
                 </div>
             </div>
 
+            <!-- Monthly Overview Section -->
+            <div class="glass-panel p-6 mb-8 fade-in delay-200">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-gray-900 dark:text-white font-bold text-lg">Monthly Overview</h3>
+                    <input type="month" id="dashboard-month-filter"
+                        class="bg-black/5 dark:bg-white/10 text-gray-900 dark:text-white font-medium px-3 py-1.5 rounded-xl border border-black/10 dark:border-white/20 text-xs outline-none shadow-sm focus:ring-2 focus:ring-blue-500">
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-500 dark:text-gray-400 font-medium">Income</span>
+                        <span id="ui-monthly-income" class="text-[17px] font-bold text-[#30D158]">Rs. 0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-500 dark:text-gray-400 font-medium">Expense</span>
+                        <span id="ui-monthly-expense" class="text-[17px] font-bold text-[#FF453A]">Rs. 0.00</span>
+                    </div>
+                    <div class="pt-3 border-t border-black/5 dark:border-white/10 flex justify-between items-center">
+                        <span class="text-[15px] text-gray-900 dark:text-white font-bold">Monthly Balance</span>
+                        <span id="ui-monthly-balance" class="text-xl font-extrabold text-blue-500">Rs. 0.00</span>
+                    </div>
+                </div>
+            </div>
+
             <p
                 class="text-center text-[10px] text-gray-400 dark:text-gray-600 font-medium uppercase tracking-widest mt-10 fade-in delay-200">
                 &copy; <span id="year"></span> Developed by Lagee Garan</p>
@@ -744,11 +768,15 @@
         const billingMonthFilter = document.getElementById('billing-month-filter');
         const chartMonthFilter = document.getElementById('chart-month-filter');
 
+        const dashMonthFilter = document.getElementById('dashboard-month-filter');
+
         const now = new Date();
         const currentMonthVal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
         adminMonthFilter.value = currentMonthVal;
         billingMonthFilter.value = currentMonthVal;
         chartMonthFilter.value = currentMonthVal;
+        dashMonthFilter.value = currentMonthVal;
+
 
         const renderFilteredList = (containerElement, txArray, monthVal) => {
             if (!txArray || txArray.length === 0) {
@@ -766,6 +794,29 @@
             renderList(containerElement, filtered);
         };
 
+        const updateMonthlySummary = () => {
+            const monthVal = dashMonthFilter.value;
+            let mIncome = 0;
+            let mExpense = 0;
+
+            const process = (tx) => {
+                if (!tx.date || !tx.amount) return;
+                if (tx.date.startsWith(monthVal)) {
+                    if (tx.type === 'income') mIncome += parseFloat(tx.amount) || 0;
+                    else if (tx.type === 'expense') mExpense += parseFloat(tx.amount) || 0;
+                }
+            };
+
+            (rawAdminTx || []).forEach(process);
+            (rawBillingTx || []).forEach(process);
+
+            document.getElementById('ui-monthly-income').innerText = 'Rs. ' + formatCurrency(mIncome);
+            document.getElementById('ui-monthly-expense').innerText = 'Rs. ' + formatCurrency(mExpense);
+            document.getElementById('ui-monthly-balance').innerText = 'Rs. ' + formatCurrency(mIncome - mExpense);
+        };
+
+        dashMonthFilter.addEventListener('change', updateMonthlySummary);
+
         adminMonthFilter.addEventListener('change', () => {
             renderFilteredList(uiAdminList, rawAdminTx, adminMonthFilter.value);
         });
@@ -773,6 +824,7 @@
         billingMonthFilter.addEventListener('change', () => {
             renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
         });
+
 
         chartMonthFilter.addEventListener('change', () => {
             renderMobileChart(rawAdminTx, rawBillingTx);
@@ -910,8 +962,12 @@
                 renderFilteredList(uiAdminList, rawAdminTx, adminMonthFilter.value);
                 renderFilteredList(uiBillingList, rawBillingTx, billingMonthFilter.value);
                 
+                // Update Dashboard Monthly Summary
+                updateMonthlySummary();
+
                 // Render Chart
                 renderMobileChart(rawAdminTx, rawBillingTx);
+
 
             } else {
                 uiAdminList.innerHTML = `<div class="py-12 text-center text-gray-500 text-[15px]">System not synced yet.</div>`;
