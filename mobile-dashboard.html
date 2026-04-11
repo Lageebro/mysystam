@@ -1115,15 +1115,23 @@
                         const newTx = data.recentTransactions[0];
                         const oldTx = rawAdminTx[0];
                         if (newTx && oldTx && newTx.id !== oldTx.id) {
-                            const prefix = newTx.type === 'income' ? 'Income Added ✅' : 'Expense Logged 🔻';
-                            window.sendMobileNotification(prefix, `Rs. ${formatCurrency(newTx.amount)} - ${newTx.description || 'System Update'}`);
+                            const isIncome = newTx.type === 'income';
+                            const title = isIncome ? '💳 CREDIT ALERT' : '💳 DEBIT ALERT';
+                            const bodyText = isIncome 
+                                ? `LKR ${formatCurrency(newTx.amount)} was credited to your system.\nAvl Bal: LKR ${formatCurrency(data.netBalance)}\nRef: ${newTx.description || 'System Update'}`
+                                : `LKR ${formatCurrency(newTx.amount)} was debited from your system.\nAvl Bal: LKR ${formatCurrency(data.netBalance)}\nRef: ${newTx.description || 'System Update'}`;
+                            
+                            window.sendMobileNotification(title, bodyText);
                         }
                     }
                     if (rawBillingTx && rawBillingTx.length > 0 && data.recentBillingTx && data.recentBillingTx.length > 0) {
                         const newBill = data.recentBillingTx[0];
                         const oldBill = rawBillingTx[0];
                         if (newBill && oldBill && newBill.id !== oldBill.id) {
-                            window.sendMobileNotification(`New Invoice Billed 🧾`, `Rs. ${formatCurrency(newBill.amount)} - ${newBill.description || ''}`);
+                            window.sendMobileNotification(
+                                '📄 INVOICE GENERATED', 
+                                `Amount: LKR ${formatCurrency(newBill.amount)}\nAvl Bal: LKR ${formatCurrency(data.netBalance)}\nRef: ${newBill.description || 'System Update'}`
+                            );
                         }
                     }
                 }
