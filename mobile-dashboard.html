@@ -341,6 +341,11 @@
             </div>
 
             <div class="flex gap-2">
+                <!-- Notification Permission Button -->
+                <button id="enable-notif-btn"
+                    class="glass-btn w-10 h-10 rounded-full flex items-center justify-center text-gray-800 dark:text-gray-200 active:scale-95 transition-transform">
+                    <i class="ph ph-bell text-[20px]"></i>
+                </button>
                 <!-- Theme Toggle Button -->
                 <button id="theme-toggle"
                     class="glass-btn w-10 h-10 rounded-full flex items-center justify-center text-gray-800 dark:text-gray-200 active:scale-95 transition-transform">
@@ -494,14 +499,95 @@
         </div>
     </nav>
 
+    <!-- Notifications Modal -->
+    <div id="notif-modal" class="fixed inset-0 z-[100] bg-black/60 dark:bg-black/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute bottom-0 left-0 right-0 max-h-[85vh] bg-white dark:bg-[#0a0f1c] rounded-t-3xl shadow-2xl transform translate-y-full transition-transform duration-400 ease-out flex flex-col" id="notif-modal-content">
+            <!-- Handle -->
+            <div class="w-full flex justify-center py-3" id="notif-close-handle">
+                <div class="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+            </div>
+            
+            <div class="px-6 pb-4 flex justify-between items-center border-b border-gray-100 dark:border-gray-800">
+                <h2 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="ph ph-bell-ringing text-blue-500"></i> Notifications
+                </h2>
+                <button id="clear-notifs-btn" class="text-xs bg-red-50 text-red-500 dark:bg-red-500/10 font-bold px-3 py-1.5 rounded-lg active:scale-95 transition-transform">Clear All</button>
+            </div>
+            
+            <div class="p-4 mx-6 mt-4 rounded-xl flex items-center justify-between mb-2 bg-gradient-to-r from-blue-500/10 to-blue-500/5 dark:from-blue-500/20 dark:to-transparent border border-blue-500/20">
+                <div class="text-sm">
+                    <span class="font-bold text-gray-800 dark:text-gray-200 block">Lockscreen Alerts</span>
+                    <span class="text-[11px] text-gray-500 font-medium">Enable native OS notifications</span>
+                </div>
+                <button id="os-notif-btn" class="bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm active:scale-95 transition-all">Enable</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3 custom-scrollbar min-h-[300px]" id="notif-list">
+                <!-- Notifications get injected here -->
+            </div>
+        </div>
+    </div>
+
     <!-- Logic Script -->
     <script>
-        // --- Notifications Setup ---
+        // --- Notifications Setup & History ---
+        const NOTIF_CACHE_KEY = 'fintrack_saved_notifs';
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
         }
 
+        const renderNotifs = () => {
+            const list = document.getElementById('notif-list');
+            if(!list) return;
+            const notifs = JSON.parse(localStorage.getItem(NOTIF_CACHE_KEY) || '[]');
+            if (notifs.length === 0) {
+                list.innerHTML = `<div class="py-10 text-center text-gray-400 dark:text-gray-500 flex flex-col items-center"><i class="ph ph-bell-slash text-4xl mb-2 opacity-30"></i><p class="text-[13px] font-medium">No notifications yet.</p></div>`;
+                return;
+            }
+            
+            list.innerHTML = notifs.map(n => {
+                const timeStr = new Date(n.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const dateStr = new Date(n.date).toLocaleDateString([], {month:'short', day:'numeric'});
+                const isCredit = n.title.includes('CREDIT') || n.title.includes('INCOME') || n.title.includes('Added');
+                const isDebit = n.title.includes('DEBIT') || n.title.includes('EXPENSE') || n.title.includes('Logged');
+                const isInvoice = n.title.includes('INVOICE') || n.title.includes('Billed');
+                
+                let icon = 'ph-bell';
+                let color = 'text-blue-500';
+                let bg = 'bg-blue-100 dark:bg-blue-500/20';
+                
+                if (isCredit) { icon = 'ph-arrow-down-left'; color = 'text-[#30D158]'; bg = 'bg-[#30D158]/20'; }
+                else if (isDebit) { icon = 'ph-arrow-up-right'; color = 'text-[#FF453A]'; bg = 'bg-[#FF453A]/20'; }
+                else if (isInvoice) { icon = 'ph-receipt'; color = 'text-purple-500'; bg = 'bg-purple-100 dark:bg-purple-500/20'; }
+                
+                return `
+                <div class="bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/10 p-3.5 rounded-2xl flex gap-3 relative overflow-hidden">
+                    <div class="w-10 h-10 rounded-xl ${bg} flex items-center justify-center shrink-0">
+                        <i class="ph ${icon} ${color} text-xl font-bold"></i>
+                    </div>
+                    <div class="flex-1 min-w-0 pr-12">
+                        <h4 class="font-bold text-[14px] text-gray-900 dark:text-white leading-tight mb-0.5 truncate">${n.title}</h4>
+                        <p class="text-[12px] font-medium text-gray-500 dark:text-gray-400 leading-snug whitespace-pre-line">${n.body}</p>
+                    </div>
+                    <div class="absolute top-3.5 right-3.5 text-[10px] font-bold text-gray-400 text-right">
+                        ${dateStr}<br>${timeStr}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        };
+
+        const saveNotification = (title, body) => {
+            const notifs = JSON.parse(localStorage.getItem(NOTIF_CACHE_KEY) || '[]');
+            notifs.unshift({ title, body, date: new Date().toISOString(), id: Date.now() });
+            if (notifs.length > 50) notifs.pop(); // keep last 50
+            localStorage.setItem(NOTIF_CACHE_KEY, JSON.stringify(notifs));
+            renderNotifs();
+        };
+
         window.sendMobileNotification = (title, body) => {
+            saveNotification(title, body);
+
             // 1. Show In-App iOS Banner Notification
             const toast = document.createElement('div');
             toast.className = 'fixed top-4 left-4 right-4 md:left-auto md:w-[380px] bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-2xl p-4 rounded-[20px] shadow-[0_10px_40px_rgba(0,0,0,0.15)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-black/5 dark:border-white/10 z-[99999] transform translate-y-[-150%] transition-transform duration-500 ease-out flex gap-4 items-start';
@@ -533,7 +619,79 @@
                     setTimeout(() => { if (toast.parentNode) toast.remove(); }, 500);
                 }
             }, 6000);
+
+            // 2. Try Native Notification if granted
+            if ("Notification" in window && Notification.permission === "granted") {
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.ready.then(reg => {
+                        reg.showNotification(title, { body: body, icon: 'Logo.jpg', vibrate: [200, 100, 200] });
+                    }).catch(() => { new Notification(title, { body: body, icon: 'Logo.jpg' }); });
+                } else {
+                    new Notification(title, { body: body, icon: 'Logo.jpg' });
+                }
+            }
         };
+
+        // --- Notifications Modal Logic ---
+        const notifModal = document.getElementById('notif-modal');
+        const notifModalContent = document.getElementById('notif-modal-content');
+        
+        const closeNotifModal = () => {
+            notifModalContent.style.transform = 'translateY(100%)';
+            notifModal.style.opacity = '0';
+            setTimeout(() => notifModal.style.pointerEvents = 'none', 300);
+        };
+
+        // Update OS Notif Settings visual state
+        const updateOsNotifState = () => {
+            const btn = document.getElementById('os-notif-btn');
+            if (!("Notification" in window)) {
+                btn.innerText = "Unsupported";
+                btn.className = "bg-gray-300 text-gray-500 text-xs font-bold px-4 py-2 rounded-lg";
+                btn.disabled = true;
+                return;
+            }
+            if (Notification.permission === "granted") {
+                btn.innerText = "Active ✓";
+                btn.className = "bg-[#30D158] text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm";
+                btn.disabled = true;
+            } else if (Notification.permission === "denied") {
+                btn.innerText = "Blocked";
+                btn.className = "bg-[#FF453A] text-white text-xs font-bold px-4 py-2 rounded-lg";
+                btn.disabled = true;
+            } else {
+                btn.innerText = "Enable";
+                btn.className = "bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm active:scale-95 transition-all";
+                btn.disabled = false;
+            }
+        };
+
+        document.getElementById('os-notif-btn').addEventListener('click', () => {
+            if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
+                Notification.requestPermission().then(p => updateOsNotifState());
+            }
+        });
+
+        document.getElementById('enable-notif-btn').addEventListener('click', () => {
+            if (navigator.vibrate) navigator.vibrate(10);
+            renderNotifs();
+            updateOsNotifState();
+            notifModal.style.pointerEvents = 'auto';
+            notifModal.style.opacity = '1';
+            setTimeout(() => notifModalContent.style.transform = 'translateY(0)', 10);
+        });
+
+        document.getElementById('notif-close-handle').addEventListener('click', closeNotifModal);
+        notifModal.addEventListener('click', (e) => {
+            if(e.target === notifModal) closeNotifModal();
+        });
+
+        document.getElementById('clear-notifs-btn').addEventListener('click', () => {
+            if (confirm('Clear all notification history?')) {
+                localStorage.removeItem(NOTIF_CACHE_KEY);
+                renderNotifs();
+            }
+        });
 
         // --- Biometrics & Lock Screen Logic ---
         const authScreen = document.getElementById('auth-screen');
@@ -775,6 +933,26 @@
                 window.mobileChartInstance.options.scales.x.grid.color = gridColor;
                 window.mobileChartInstance.options.scales.y.grid.color = gridColor;
                 window.mobileChartInstance.update();
+            }
+        });
+
+        // Push Notification Permission Trigger
+        const enableNotifBtn = document.getElementById('enable-notif-btn');
+        enableNotifBtn.addEventListener('click', () => {
+            if (!("Notification" in window)) {
+                alert("Your browser does not support Native Lockscreen Notifications.");
+                return;
+            }
+            if (Notification.permission === "granted") {
+                alert("Notifications are already enabled!");
+            } else {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        alert("Native Lockscreen Notifications Enabled Successfully! Keep the app running in the background to receive them.");
+                    } else {
+                        alert("Permission denied. You can't receive Lockscreen notifications.");
+                    }
+                });
             }
         });
 
