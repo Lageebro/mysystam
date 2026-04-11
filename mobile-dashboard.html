@@ -502,30 +502,38 @@
         }
 
         window.sendMobileNotification = (title, body) => {
-            if (!("Notification" in window)) return;
-            if (Notification.permission === "granted") {
-                if (navigator.serviceWorker) {
-                    navigator.serviceWorker.ready.then(reg => {
-                        reg.showNotification(title, {
-                            body: body,
-                            icon: 'Logo.jpg',
-                            vibrate: [200, 100, 200]
-                        });
-                    }).catch(() => {
-                        new Notification(title, { body: body, icon: 'Logo.jpg' });
-                    });
-                } else {
-                    new Notification(title, { body: body, icon: 'Logo.jpg' });
+            // 1. Show In-App iOS Banner Notification
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 left-4 right-4 md:left-auto md:w-[380px] bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-2xl p-4 rounded-[20px] shadow-[0_10px_40px_rgba(0,0,0,0.15)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.5)] border border-black/5 dark:border-white/10 z-[99999] transform translate-y-[-150%] transition-transform duration-500 ease-out flex gap-4 items-start';
+            toast.innerHTML = `
+                <img src="2.png" class="w-10 h-10 rounded-[10px] shrink-0 border border-black/10 dark:border-white/10 shadow-sm mt-0.5">
+                <div class="flex-1 min-w-0">
+                    <h4 class="font-bold text-[15px] text-gray-900 dark:text-white leading-tight mb-0.5 tracking-tight">${title}</h4>
+                    <p class="text-[13px] font-medium text-gray-600 dark:text-gray-300 leading-snug whitespace-pre-line tracking-tight">${body}</p>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            
+            requestAnimationFrame(() => toast.style.transform = 'translateY(10px)');
+            
+            let startY = 0;
+            toast.addEventListener('touchstart', e => startY = e.touches[0].clientY, {passive: true});
+            toast.addEventListener('touchmove', e => {
+                if (e.touches[0].clientY < startY - 10) {
+                    toast.style.transform = 'translateY(-150%)';
+                    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 500);
                 }
-            }
-        };
+            }, {passive: true});
 
-        // Request permission on first interaction (iOS requirement)
-        document.addEventListener('click', () => {
-            if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-                Notification.requestPermission();
-            }
-        }, { once: true });
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.style.transform = 'translateY(-150%)';
+                    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 500);
+                }
+            }, 6000);
+        };
 
         // --- Biometrics & Lock Screen Logic ---
         const authScreen = document.getElementById('auth-screen');
